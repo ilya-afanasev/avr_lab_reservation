@@ -7,8 +7,8 @@ class Resource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
 
-    type = db.Column(db.Integer, db.ForeignKey('resource_types'))
-    reservation = db.relationship('reservations', backref='resources')
+    type = db.Column(db.Integer, db.ForeignKey('resource_types.id'))
+    reservation = db.relationship('Reservation', backref='Resource')
 
 
 class ResourceType(db.Model):
@@ -16,7 +16,7 @@ class ResourceType(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
-    resource = db.relationship('resources', backref='resource_types')
+    resource = db.relationship('Resource', backref='ResourceType')
 
 
 class Reservation(db.Model):
@@ -28,13 +28,13 @@ class Reservation(db.Model):
     end_datetime = db.Column(db.DateTime)
 
     resource_id = db.Column(db.Integer, db.ForeignKey('resources.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     db.CheckConstraint('start_datetime < end_datetime', name='dates_check')
 
 
 class User(db.Model):
-    __tablename__ = "users"
+    __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(255))
