@@ -1,0 +1,6 @@
+.idea
+__pychache___
+venv
+*.db
+*.sqlite
+*.pyc
