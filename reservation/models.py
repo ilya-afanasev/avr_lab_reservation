@@ -36,8 +36,8 @@ class User(db.Model):
     reservation = db.relationship('Reservation', backref='User')
 
     def __str__(self):
-        return "{} {}, ID: {}, Email: {} github_id: {}".format(
-            self.first_name, self.last_name, self.id, self.email, self.github_id)
+        return "ID: {}, Email: {} github_id: {}".format(
+            self.id, self.email, self.github_id)
 
 
 class Reservation(db.Model):
