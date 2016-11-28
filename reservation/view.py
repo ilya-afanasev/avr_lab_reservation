@@ -95,7 +95,7 @@ class Reservations(ResourceBase):
         'user': {
             'id': fields.Integer(attribute='User.id'),
             'email': fields.String(attribute='User.email'),
-            'github_id': fields.Integer(attribute='User.github_id')
+            'github_id': fields.Integer(attribute='User.github_id', default=None)
         },
         'resource': {
             'id': fields.Integer(attribute='Resource.id'),
@@ -118,16 +118,24 @@ class Reservations(ResourceBase):
         resource_args = {'name': v for (k, v) in params.items() if k == 'resource_name'}
         reservation_args = {k: v for (k, v) in params.items() if k == 'id'}
 
-        reservations = models.Reservation.query. \
-            filter_by(**reservation_args). \
-            join(models.User). \
-            filter_by(**user_args). \
-            join(models.Resource). \
-            filter_by(**resource_args). \
-            join(models.ResourceType).all()
+        query = models.Reservation.query
+        if reservation_args:
+            query = query.filter_by(**reservation_args)
+
+        query = query.join(models.User)
+        if user_args:
+            query = query.filter_by(**user_args)
+
+        query = query.join(models.Resource)
+        if resource_args:
+            query = query.filter_by(**resource_args)
+
+        query = query.join(models.ResourceType)
+
+        reservations = query.all()
 
         db.session.commit()
-        if not reservations:
+        if reservation_args and not reservations:
             abort(404, message="Reservations with parameters {} do not exist".format(params))
         return reservations, 200
 
@@ -252,7 +260,11 @@ class Resources(ResourceBase):
             resource_type = get_item_or_404(models.ResourceType, name=params['type'])
             params['type'] = resource_type.id
 
-        resources = models.Resource.query.filter_by(**params).join(models.ResourceType).all()
+        query = models.Resource.query
+        if params:
+            query = query.filter_by(**params)
+        query.join(models.ResourceType)
+        resources = query.all()
 
         if not resources:
             abort(404, message="Resources with parameters {} do not exist".format(params))
