@@ -21,7 +21,7 @@ def index():
     return '<a href="/admin/">Click me to get to Admin!</a>'
 
 # Create admin
-admin = admin.Admin(app, name='Example: SQLAlchemy2', template_mode='bootstrap3')
+admin = admin.Admin(app, name='Reservation server', template_mode='bootstrap3')
 admin.add_view(ModelView(User, db.session))
 admin.add_view(ModelView(Reservation, db.session))
 admin.add_view(ModelView(Resource, db.session))
