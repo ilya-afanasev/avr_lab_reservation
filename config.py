@@ -3,6 +3,7 @@ import os
 
 _basedir = os.path.abspath(os.path.dirname(__file__))
 
+ERROR_404_HELP=False
 DEBUG = True
 WTF_CSRF_ENABLED = True
 SECRET_KEY = '123456790'
