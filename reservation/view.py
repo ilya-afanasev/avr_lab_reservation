@@ -186,8 +186,8 @@ class Reservations(ResourceBase):
     def validate_reservation(reservation):
         count = models.Reservation.query.\
             filter_by(resource_id=reservation.resource_id).\
-            filter(and_(models.Reservation.start_datetime < reservation.end_datetime,
-                        models.Reservation.end_datetime > reservation.start_datetime,
+            filter(and_(models.Reservation.start_datetime <= reservation.end_datetime,
+                        models.Reservation.end_datetime >= reservation.start_datetime,
                         models.Reservation.id != reservation.id)).count()
         return count == 0
 
