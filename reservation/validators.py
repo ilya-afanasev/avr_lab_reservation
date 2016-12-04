@@ -2,12 +2,12 @@ from flask import request
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from wtforms import ValidationError
+from wtforms.validators import StopValidation
 
 from reservation import models
 
 
 class IsReserved:
-
     def __init__(self, message=None):
         self.message = message
 
@@ -16,10 +16,10 @@ class IsReserved:
         try:
             start_datetime = form['start_datetime'].data
             end_datetime = form['end_datetime'].data
-            resource_id = form['Resource'].data.id
-            resource_name = form['Resource'].data.name
+            resource_id = form['Resource'].data.id if form['Resource'].data else None
+            resource_name = form['Resource'].data.name if form['Resource'].data else None
             reservation_id = request.args.get('id', None)
-        except KeyError:
+        except (KeyError, AttributeError):
             raise ValidationError(field.gettext("Invalid field name in reservation validator."))
 
         count = 0
@@ -40,7 +40,6 @@ class IsReserved:
 
 
 class StartLessEnd:
-
     def __init__(self, message=None):
         self.message = message
 
@@ -50,8 +49,26 @@ class StartLessEnd:
             end_datetime = form['end_datetime'].data
         except KeyError:
             raise ValidationError(field.gettext("Invalid field name in reservation validator."))
-        if end_datetime < start_datetime:
+        if not start_datetime or not end_datetime or end_datetime < start_datetime:
             message = self.message
             if message is None:
                 message = field.gettext('Start time should be less than end. Please, check your dates.')
             raise ValidationError(message)
+
+
+class OneOfRequired:
+    def __init__(self, *fields, message=None):
+        self.fields = fields
+        self.message = message
+
+    def __call__(self, form, field):
+        result = False
+        try:
+            result = any(form[field].data for field in self.fields)
+        except KeyError:
+            raise ValidationError(field.gettext("Invalid field name for validation."))
+        if not result:
+            message = self.message
+            if message is None:
+                message = field.gettext('One of parameters {} is required.')
+            raise StopValidation(message.format(self.fields))
