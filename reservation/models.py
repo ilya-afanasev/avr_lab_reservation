@@ -50,6 +50,7 @@ class Reservation(db.Model):
 
     resource_id = db.Column(db.Integer, db.ForeignKey('resources.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    token = db.Column(db.String(150), unique=True)
 
     db.CheckConstraint('start_datetime < end_datetime', name='dates_check')
 

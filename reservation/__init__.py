@@ -35,6 +35,8 @@ api.add_resource(rest_view.Resources, '/resources', endpoint='resources')
 api.add_resource(rest_view.Reservations, '/reservations', endpoint='reservations')
 api.add_resource(rest_view.Reservations, '/reservations/<int:reservation_id>', endpoint='reservation')
 
+api.add_resource(rest_view.ReservationToken, '/reservation/token/<token>', endpoint='reservation_token')
+
 
 @app.route('/')
 def index():

@@ -1,11 +1,12 @@
 from datetime import datetime
 
-from flask_restful.reqparse import RequestParser
 from flask_restful import abort, Resource as ResourceBase, marshal_with, fields
+from flask_restful.reqparse import RequestParser
+from itsdangerous import URLSafeSerializer
 from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
 
-from reservation import models, db
+from reservation import models, db, app
 
 
 def get_item_or_404(Type, **kwargs):
@@ -90,17 +91,18 @@ class Reservations(ResourceBase):
         'reservation': {
             'id': fields.Integer(),
             'start_datetime': fields.DateTime("iso8601"),
-            'end_datetime': fields.DateTime("iso8601")
-        },
-        'user': {
-            'id': fields.Integer(attribute='User.id'),
-            'email': fields.String(attribute='User.email'),
-            'github_id': fields.Integer(attribute='User.github_id', default=None)
-        },
-        'resource': {
-            'id': fields.Integer(attribute='Resource.id'),
-            'name': fields.String(attribute='Resource.name'),
-            'type': fields.String(attribute='Resource.ResourceType.name')
+            'end_datetime': fields.DateTime("iso8601"),
+            'token': fields.String(),
+            'user': {
+                'id': fields.Integer(attribute='User.id'),
+                'email': fields.String(attribute='User.email'),
+                'github_id': fields.Integer(attribute='User.github_id', default=None)
+            },
+            'resource': {
+                'id': fields.Integer(attribute='Resource.id'),
+                'name': fields.String(attribute='Resource.name'),
+                'type': fields.String(attribute='Resource.ResourceType.name')
+            }
         }
     }
 
@@ -145,6 +147,15 @@ class Reservations(ResourceBase):
         db.session.commit()
         return '', 204
 
+    @staticmethod
+    def _generate_unique_token(reservation):
+        serializer = URLSafeSerializer(app.config['SECRET_KEY'])
+        for i in range(3):
+            token = serializer.dumps(reservation + str(datetime.now()), salt=app.config['SECURITY_PASSWORD_SALT'])
+            if models.Reservation.query.filter_by(token=token).count() == 0:
+                return token
+        raise RuntimeError('Cannot generate unique access token')
+
     @marshal_with(reservation_fields)
     def put(self, reservation_id):
 
@@ -172,27 +183,31 @@ class Reservations(ResourceBase):
             reservation.start_datetime = args['start_datetime']
             reservation.end_datetime = args['end_datetime']
 
-            if not self.validate_reservation(reservation):
+            reservation.token = Reservations._generate_unique_token(str(reservation))
+
+            if not self._validate_reservation(reservation):
                 abort(400, message="The time is already reserved")
 
             db.session.commit()
 
         except IntegrityError as ex:
             abort(422, message=str(ex))
+        except RuntimeError as ex:
+            abort(422, message=str(ex))
 
         return reservation, 201
 
     @staticmethod
-    def validate_reservation(reservation):
-        count = models.Reservation.query.\
-            filter_by(resource_id=reservation.resource_id).\
-            filter(and_(models.Reservation.start_datetime <= reservation.end_datetime,
-                        models.Reservation.end_datetime >= reservation.start_datetime,
-                        models.Reservation.id != reservation.id)).count()
+    def _validate_reservation(reservation):
+        count = models.Reservation.query. \
+            filter_by(resource_id=reservation.resource_id). \
+            filter((and_(models.Reservation.start_datetime <= reservation.end_datetime,
+                         models.Reservation.end_datetime >= reservation.start_datetime,
+                         models.Reservation.id != reservation.id))).count()
         return count == 0
 
     @staticmethod
-    def create_user_if_not_exist(**user_params):
+    def _create_user_if_not_exist(**user_params):
         user = models.User.query.filter_by(**user_params).first()
         if not user:
             user = models.User(**user_params)
@@ -220,22 +235,26 @@ class Reservations(ResourceBase):
         reservation_args = {k: v for (k, v) in params.items() if k in ('start_datetime', 'end_datetime')}
 
         try:
-            user = self.create_user_if_not_exist(**user_args)
+            user = self._create_user_if_not_exist(**user_args)
             resource = get_item_or_404(models.Resource, **resource_args)
             reservation = models.Reservation(resource_id=resource.id,
                                              user_id=user.id,
                                              **reservation_args)
-            if not self.validate_reservation(reservation):
+            if not self._validate_reservation(reservation):
                 abort(400, message="The time is already reserved")
 
             reservation_info = reservation.query.join(models.User). \
                 join(models.Resource). \
                 join(models.ResourceType).first()
 
+            reservation_info.token = Reservations._generate_unique_token(str(reservation_info))
+
             db.session.add(reservation)
             db.session.commit()
 
         except IntegrityError as ex:
+            abort(422, message=str(ex))
+        except RuntimeError as ex:
             abort(422, message=str(ex))
         return reservation_info, 201
 
@@ -271,3 +290,19 @@ class Resources(ResourceBase):
 
         db.session.commit()
         return resources, 200
+
+
+class ReservationToken(ResourceBase):
+    @marshal_with(Reservations.reservation_fields)
+    def get(self, token):
+        reservation_info = models.Reservation.query. \
+            filter_by(token=token). \
+            join(models.User). \
+            join(models.Resource). \
+            join(models.ResourceType).first()
+
+        if not reservation_info:
+            abort(404, message='Invalid reservation token')
+
+        db.session.commit()
+        return reservation_info, 200
