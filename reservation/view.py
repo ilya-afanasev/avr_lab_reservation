@@ -243,14 +243,16 @@ class Reservations(ResourceBase):
             if not self._validate_reservation(reservation):
                 abort(400, message="The time is already reserved")
 
-            reservation_info = reservation.query.join(models.User). \
-                join(models.Resource). \
-                join(models.ResourceType).first()
-
-            reservation_info.token = Reservations._generate_unique_token(str(reservation_info))
+            reservation.token = Reservations._generate_unique_token(str(reservation))
 
             db.session.add(reservation)
             db.session.commit()
+
+            reservation_info = models.Reservation.query. \
+                filter_by(id=reservation.id). \
+                join(models.User). \
+                join(models.Resource). \
+                join(models.ResourceType).first()
 
         except IntegrityError as ex:
             abort(422, message=str(ex))
