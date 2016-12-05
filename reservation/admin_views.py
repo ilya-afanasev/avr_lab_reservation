@@ -28,6 +28,8 @@ class ReservationAdminView(ModelView):
         'User': {'validators': [validators.required()]}
     }
 
+    column_list = ['start_datetime', 'end_datetime', 'Resource', 'User', 'token']
+
 
 class ResourceTypeAdminView(ModelView):
     form_excluded_columns = ['resource']
