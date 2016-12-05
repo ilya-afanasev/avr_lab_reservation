@@ -49,7 +49,7 @@ class StartLessEnd:
             end_datetime = form['end_datetime'].data
         except KeyError:
             raise ValidationError(field.gettext("Invalid field name in reservation validator."))
-        if not start_datetime or not end_datetime or end_datetime < start_datetime:
+        if not start_datetime or not end_datetime or end_datetime <= start_datetime:
             message = self.message
             if message is None:
                 message = field.gettext('Start time should be less than end. Please, check your dates.')
@@ -62,7 +62,6 @@ class OneOfRequired:
         self.message = message
 
     def __call__(self, form, field):
-        result = False
         try:
             result = any(form[field].data for field in self.fields)
         except KeyError:
