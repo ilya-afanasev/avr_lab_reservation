@@ -12,3 +12,4 @@ SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI',
                                     'sqlite:///' + os.path.join(_basedir, 'reservation.db'))
 SESSION_TYPE = 'filesystem'
 SQLALCHEMY_ECHO = True
+RESOURCE_CONFIG_PATH = os.path.join(_basedir, 'config.ini')
