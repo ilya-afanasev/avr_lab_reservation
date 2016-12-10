@@ -5,12 +5,11 @@ class Resource(db.Model):
     __tablename__ = 'resources'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
     model = db.Column(db.String(100))
     path = db.Column(db.String)
-    available = db.Column(db.Boolean)
+    available = db.Column(db.Boolean, nullable=False)
 
-    type = db.Column(db.Integer, db.ForeignKey('resource_types.id'))
+    type = db.Column(db.Integer, db.ForeignKey('resource_types.id'), nullable=False)
     reservation = db.relationship('Reservation', backref='Resource')
 
     def __str__(self):

@@ -52,6 +52,6 @@ def update_resources():
         app.logger.error(ex)
         flash(str(ex), category='error')
         return redirect(url_for('admin.index'))
-    flash('Resource settings was reloaded from config', category='success')
+    flash('Resource settings were reloaded from config successfully.', category='success')
     return redirect(url_for('admin.index'))
 

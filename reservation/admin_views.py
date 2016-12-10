@@ -12,9 +12,9 @@ class UserAdminView(ModelView):
 
 
 class ResourceAdminView(ModelView):
+    column_list = ['id', 'model', 'ResourceType', 'available']
     form_excluded_columns = ['reservation']
     form_args = {
-        'name': {'validators': [validators.required()]},
         'ResourceType': {'label': 'Resource type', 'validators': [validators.required()]}
     }
 
