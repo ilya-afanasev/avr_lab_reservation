@@ -95,12 +95,12 @@ class Reservations(ResourceBase):
             'token': fields.String(),
             'user': {
                 'id': fields.Integer(attribute='User.id'),
-                'email': fields.String(attribute='User.email'),
+                'email': fields.String(attribute='User.email', default=None),
                 'github_id': fields.Integer(attribute='User.github_id', default=None)
             },
             'resource': {
                 'id': fields.Integer(attribute='Resource.id'),
-                'name': fields.String(attribute='Resource.name'),
+                'model': fields.String(attribute='Resource.model'),
                 'type': fields.String(attribute='Resource.ResourceType.name')
             }
         }
@@ -113,11 +113,11 @@ class Reservations(ResourceBase):
         args_parser.add_argument('id', type=int, store_missing=False)
         args_parser.add_argument('email', type=str, store_missing=False)
         args_parser.add_argument('github_id', type=str, store_missing=False)
-        args_parser.add_argument('resource_name', type=str, store_missing=False)
+        args_parser.add_argument('resource_id', type=str, store_missing=False)
         params = args_parser.parse_args()
 
         user_args = {k: v for (k, v) in params.items() if k in ('email', 'github_id')}
-        resource_args = {'name': v for (k, v) in params.items() if k == 'resource_name'}
+        resource_args = {'id': v for (k, v) in params.items() if k == 'resource_id'}
         reservation_args = {k: v for (k, v) in params.items() if k == 'id'}
 
         query = models.Reservation.query
@@ -160,7 +160,7 @@ class Reservations(ResourceBase):
     def put(self, reservation_id):
 
         args_parser = RequestParser()
-        args_parser.add_argument('resource_name', type=str, required=True, nullable=False)
+        args_parser.add_argument('resource_id', type=str, required=True, nullable=False)
         args_parser.add_argument('start_datetime', type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
                                  required=True, nullable=False)
         args_parser.add_argument('end_datetime', type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
@@ -169,7 +169,7 @@ class Reservations(ResourceBase):
         args = args_parser.parse_args()
 
         try:
-            resource = get_item_or_404(models.Resource, name=args['resource_name'])
+            resource = get_item_or_404(models.Resource, id=args['resource_id'])
 
             reservation = models.Reservation.query. \
                 filter_by(id=reservation_id). \
@@ -178,7 +178,7 @@ class Reservations(ResourceBase):
                 join(models.ResourceType).first()
 
             if not reservation:
-                abort(404, message="Reservation with parameters {} do not exist".format(id=reservation_id))
+                abort(404, message="Reservation with parameters {} do not exist".format(reservation_id))
             reservation.resource_id = resource.id
             reservation.start_datetime = args['start_datetime']
             reservation.end_datetime = args['end_datetime']
@@ -218,7 +218,7 @@ class Reservations(ResourceBase):
     def post(self):
 
         args_parser = RequestParser()
-        args_parser.add_argument('resource_name', type=str, required=True, nullable=False, dest='name')
+        args_parser.add_argument('resource_id', type=str, required=True, nullable=False)
         args_parser.add_argument('start_datetime', type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
                                  required=True, nullable=False)
         args_parser.add_argument('end_datetime', type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
@@ -231,7 +231,7 @@ class Reservations(ResourceBase):
         user_args = {k: v for (k, v) in params.items() if k in ('email', 'github_id')}
         if not user_args:
             abort(400, message='Cannot find email or github_id in arguments')
-        resource_args = {k: v for (k, v) in params.items() if k == 'name'}
+        resource_args = {'id': v for (k, v) in params.items() if k == 'resource_id'}
         reservation_args = {k: v for (k, v) in params.items() if k in ('start_datetime', 'end_datetime')}
 
         try:
@@ -264,7 +264,8 @@ class Reservations(ResourceBase):
 class Resources(ResourceBase):
     resource_fields = {
         'id': fields.Integer,
-        'name': fields.String,
+        'model': fields.String,
+        'available': fields.Boolean,
         'type': fields.String(attribute='ResourceType.name')
     }
 
@@ -274,7 +275,9 @@ class Resources(ResourceBase):
 
         args_parser.add_argument('id', type=int, store_missing=False)
         args_parser.add_argument('type', type=str, store_missing=False)
-        args_parser.add_argument('name', type=str, store_missing=False)
+        args_parser.add_argument('model', type=str, store_missing=False)
+        args_parser.add_argument('available', type=bool, store_missing=False)
+
         params = args_parser.parse_args()
 
         if 'type' in params:
