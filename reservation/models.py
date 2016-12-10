@@ -6,6 +6,9 @@ class Resource(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
+    model = db.Column(db.String(100))
+    path = db.Column(db.String)
+    available = db.Column(db.Boolean)
 
     type = db.Column(db.Integer, db.ForeignKey('resource_types.id'))
     reservation = db.relationship('Reservation', backref='Resource')
