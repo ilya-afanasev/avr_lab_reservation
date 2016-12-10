@@ -5,6 +5,10 @@ from reservation import app, db
 from reservation.models import Resource, ResourceType
 
 
+SIMULATOR_TYPE = 'simulator'
+MCU_TYPE = 'MCU'
+
+
 def get_resource_config():
     resources = []
     config = configparser.ConfigParser()
@@ -32,37 +36,37 @@ def add_type_if_not_exist(type_name):
 
 
 def init_resources():
-    try:
-        config = get_resource_config()
-        resources = Resource.query.all()
-        processed_resources = set()
+    config = get_resource_config()
+    resources = Resource.query.all()
+    processed_resources = set()
 
-        for resource in config:
-            in_database = any(map(lambda x: x.name == resource['name'], resources))
-            if not in_database:
-                new_resource = Resource()
-                if resource['type'] != 'simulator':
-                    new_resource.path = resource['path']
-                    new_resource.model = resource['model']
-                new_resource.name = resource['name']
-                new_resource.type = add_type_if_not_exist(resource['type'])
-                new_resource.available = True
+    for resource in config:
+        in_database = any(map(lambda x: x.name == resource['name'], resources))
+        if not in_database:
+            new_resource = Resource()
+            if resource['type'] == MCU_TYPE:
+                new_resource.path = resource['path']
+                new_resource.model = resource['model']
+            elif resource['type'] != SIMULATOR_TYPE:
+                raise TypeError('Unsupported resource type {}'.format(resource['type']))
+            new_resource.name = resource['name']
+            new_resource.type = add_type_if_not_exist(resource['type'])
+            new_resource.available = True
 
-                db.session.add(new_resource)
-            else:
-                if resource['type'] != 'simulator':
-                    resource.path = resource['path']
-                    resource.model = resource['model']
-                resource.type = add_type_if_not_exist(resource['type'])
-                resource.available = True
+            db.session.add(new_resource)
+        else:
+            if resource['type'] == MCU_TYPE:
+                resource.path = resource['path']
+                resource.model = resource['model']
+            elif resource['type'] != SIMULATOR_TYPE:
+                raise TypeError('Unsupported resource type {}'.format(resource['type']))
+            resource.type = add_type_if_not_exist(resource['type'])
+            resource.available = True
 
-            processed_resources.add(resource['name'])
+        processed_resources.add(resource['name'])
 
-        for resource in resources:
-            if resource.name not in processed_resources:
-                resource.available = False
-        db.session.commit()
-    except IOError as ex:
-        app.logger.error(ex)
-    except SQLAlchemyError as ex:
-        app.logger.error(ex)
+    for resource in resources:
+        if resource.name not in processed_resources:
+            resource.available = False
+    db.session.commit()
+
