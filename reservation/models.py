@@ -13,7 +13,7 @@ class Resource(db.Model):
     reservation = db.relationship('Reservation', backref='Resource')
 
     def __str__(self):
-        return str(self.name)
+        return '#{} {}'.format(self.id, self.type if self.type == 'simulator' else self.model)
 
 
 class ResourceType(db.Model):
