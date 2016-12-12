@@ -186,7 +186,7 @@ class Reservations(ResourceBase):
             reservation.token = Reservations._generate_unique_token(str(reservation))
 
             if not self._validate_reservation(reservation):
-                abort(HTTPStatus.UNPROCESSABLE_ENTITY, message="The time is already reserved")
+                abort(HTTPStatus.FORBIDDEN, message="The time is already reserved")
 
             db.session.commit()
 
@@ -241,7 +241,7 @@ class Reservations(ResourceBase):
                                              user_id=user.id,
                                              **reservation_args)
             if not self._validate_reservation(reservation):
-                abort(HTTPStatus.BAD_REQUEST, message="The time is already reserved")
+                abort(HTTPStatus.FORBIDDEN, message="The time is already reserved")
 
             reservation.token = Reservations._generate_unique_token(str(reservation))
 
