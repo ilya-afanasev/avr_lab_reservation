@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from http import HTTPStatus
 from flask_restful import abort, Resource as ResourceBase, marshal_with, fields
 from flask_restful.reqparse import RequestParser
 from itsdangerous import URLSafeSerializer
@@ -12,7 +13,7 @@ from reservation import models, db, app
 def get_item_or_404(Type, **kwargs):
     item = Type.query.filter_by(**kwargs).first()
     if not item:
-        abort(404, message="Items with type {} and parameters {} do not exist".format(Type.__name__, kwargs))
+        abort(HTTPStatus.NOT_FOUND, message="Items with type {} and parameters {} do not exist".format(Type.__name__, kwargs))
     return item
 
 
@@ -41,13 +42,13 @@ class Users(ResourceBase):
 
         db.session.commit()
 
-        return result, 200
+        return result, HTTPStatus.OK
 
     def delete(self, user_id):
         user = get_item_or_404(models.User, id=user_id)
         db.session.delete(user)
         db.session.commit()
-        return '', 204
+        return '', HTTPStatus.NO_CONTENT
 
     @marshal_with(user_fields)
     def put(self, user_id):
@@ -64,7 +65,7 @@ class Users(ResourceBase):
 
         db.session.commit()
 
-        return user, 201
+        return user, HTTPStatus.CREATED
 
     @marshal_with(user_fields)
     def post(self):
@@ -75,15 +76,15 @@ class Users(ResourceBase):
 
         args = user_parser.parse_args()
         if not args:
-            abort(400, message='Cannot find email or github_id in arguments')
+            abort(HTTPStatus.BAD_REQUEST, message='Cannot find email or github_id in arguments')
         try:
             user = models.User(**args)
             db.session.add(user)
             db.session.commit()
 
         except IntegrityError as ex:
-            abort(422, message=str(ex))
-        return user, 201
+            abort(HTTPStatus.UNPROCESSABLE_ENTITY, message=str(ex))
+        return user, HTTPStatus.CREATED
 
 
 class Reservations(ResourceBase):
@@ -138,14 +139,14 @@ class Reservations(ResourceBase):
 
         db.session.commit()
         if reservation_args and not reservations:
-            abort(404, message="Reservations with parameters {} do not exist".format(params))
-        return reservations, 200
+            abort(HTTPStatus.NOT_FOUND, message="Reservations with parameters {} do not exist".format(params))
+        return reservations, HTTPStatus.OK
 
     def delete(self, reservation_id):
         reservation = get_item_or_404(models.Reservation, id=reservation_id)
         db.session.delete(reservation)
         db.session.commit()
-        return '', 204
+        return '', HTTPStatus.NO_CONTENT
 
     @staticmethod
     def _generate_unique_token(reservation):
@@ -177,7 +178,7 @@ class Reservations(ResourceBase):
                 join(models.ResourceType).first()
 
             if not reservation:
-                abort(404, message="Reservation with parameters {} do not exist".format(reservation_id))
+                abort(HTTPStatus.NOT_FOUND, message="Reservation with parameters {} do not exist".format(reservation_id))
             reservation.resource_id = resource.id
             reservation.start_datetime = args['start_datetime']
             reservation.end_datetime = args['end_datetime']
@@ -185,16 +186,16 @@ class Reservations(ResourceBase):
             reservation.token = Reservations._generate_unique_token(str(reservation))
 
             if not self._validate_reservation(reservation):
-                abort(400, message="The time is already reserved")
+                abort(HTTPStatus.UNPROCESSABLE_ENTITY, message="The time is already reserved")
 
             db.session.commit()
 
         except IntegrityError as ex:
-            abort(422, message=str(ex))
+            abort(HTTPStatus.UNPROCESSABLE_ENTITY, message=str(ex))
         except RuntimeError as ex:
-            abort(422, message=str(ex))
+            abort(HTTPStatus.UNPROCESSABLE_ENTITY, message=str(ex))
 
-        return reservation, 201
+        return reservation, HTTPStatus.CREATED
 
     @staticmethod
     def _validate_reservation(reservation):
@@ -229,7 +230,7 @@ class Reservations(ResourceBase):
 
         user_args = {k: v for (k, v) in params.items() if k in ('email', 'github_id')}
         if not user_args:
-            abort(400, message='Cannot find email or github_id in arguments')
+            abort(HTTPStatus.BAD_REQUEST, message='Cannot find email or github_id in arguments')
         resource_args = {'id': v for (k, v) in params.items() if k == 'resource_id'}
         reservation_args = {k: v for (k, v) in params.items() if k in ('start_datetime', 'end_datetime')}
 
@@ -240,7 +241,7 @@ class Reservations(ResourceBase):
                                              user_id=user.id,
                                              **reservation_args)
             if not self._validate_reservation(reservation):
-                abort(400, message="The time is already reserved")
+                abort(HTTPStatus.BAD_REQUEST, message="The time is already reserved")
 
             reservation.token = Reservations._generate_unique_token(str(reservation))
 
@@ -254,10 +255,10 @@ class Reservations(ResourceBase):
                 join(models.ResourceType).first()
 
         except IntegrityError as ex:
-            abort(422, message=str(ex))
+            abort(HTTPStatus.UNPROCESSABLE_ENTITY, message=str(ex))
         except RuntimeError as ex:
-            abort(422, message=str(ex))
-        return reservation_info, 201
+            abort(HTTPStatus.UNPROCESSABLE_ENTITY, message=str(ex))
+        return reservation_info, HTTPStatus.CREATED
 
 
 class Resources(ResourceBase):
@@ -290,10 +291,10 @@ class Resources(ResourceBase):
         resources = query.all()
 
         if not resources:
-            abort(404, message="Resources with parameters {} do not exist".format(params))
+            abort(HTTPStatus.NOT_FOUND, message="Resources with parameters {} do not exist".format(params))
 
         db.session.commit()
-        return resources, 200
+        return resources, HTTPStatus.OK
 
 
 class ReservationToken(ResourceBase):
@@ -306,7 +307,7 @@ class ReservationToken(ResourceBase):
             join(models.ResourceType).first()
 
         if not reservation_info:
-            abort(404, message='Invalid reservation token')
+            abort(HTTPStatus.BAD_REQUEST, message='Invalid reservation token')
 
         db.session.commit()
-        return reservation_info, 200
+        return reservation_info, HTTPStatus.OK
