@@ -216,10 +216,10 @@ class Reservations(ResourceBase):
                   message='Max reservation duration is {} hours'.format(app.config['MAX_RESERVATION_DURATION_HOURS']))
 
     @staticmethod
-    def _check_reservations_count(email, github_id):
+    def _check_reservations_count(user_id):
         now = datetime.utcnow()
         count = models.Reservation.query. \
-            filter_by(email=email, github_id=github_id). \
+            filter_by(user_id=user_id). \
             filter(models.Reservation.end_datetime > now).count()
         return count < app.config['MAX_RESERVATIONS_FOR_USER']
 
@@ -282,7 +282,7 @@ class Reservations(ResourceBase):
             user = self._create_user_if_not_exist(**user_args)
             resource = get_item_or_404(models.Resource, **resource_args)
 
-            if not self._check_reservations_count(user.email, user.github_id):
+            if not self._check_reservations_count(user.id):
                 abort(HTTPStatus.FORBIDDEN,
                       message='Max count of reservations for user is {}'.format(app.config['MAX_RESERVATIONS_FOR_USER']))
 
