@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from http import HTTPStatus
 from flask_restful import abort, Resource as ResourceBase, marshal_with, fields
@@ -168,6 +168,8 @@ class Reservations(ResourceBase):
 
         args = args_parser.parse_args()
 
+        self._validate_args(args)
+
         try:
             resource = get_item_or_404(models.Resource, id=args['resource_id'])
 
@@ -179,13 +181,17 @@ class Reservations(ResourceBase):
 
             if not reservation:
                 abort(HTTPStatus.NOT_FOUND, message="Reservation with parameters {} do not exist".format(reservation_id))
+
+            if self._is_active_reservation(reservation.start_datetime, reservation.end_datetime):
+                abort(HTTPStatus.FORBIDDEN, message='It is active reservation. You can only delete it')
+
             reservation.resource_id = resource.id
             reservation.start_datetime = args['start_datetime']
             reservation.end_datetime = args['end_datetime']
 
             reservation.token = Reservations._generate_unique_token(str(reservation))
 
-            if not self._validate_reservation(reservation):
+            if self._is_reserved_already(reservation):
                 abort(HTTPStatus.FORBIDDEN, message="The time is already reserved")
 
             db.session.commit()
@@ -198,13 +204,49 @@ class Reservations(ResourceBase):
         return reservation, HTTPStatus.CREATED
 
     @staticmethod
-    def _validate_reservation(reservation):
+    def _validate_args(args):
+        if not Reservations._start_less_end(args['start_datetime'], args['end_datetime']):
+            abort(HTTPStatus.FORBIDDEN, message='Start date and time should be more than end')
+
+        if not Reservations._start_in_future(args['start_datetime']):
+            abort(HTTPStatus.FORBIDDEN, message='Start date and time should be in the future')
+
+        if not Reservations._check_duration(args['start_datetime'], args['end_datetime']):
+            abort(HTTPStatus.FORBIDDEN,
+                  message='Max reservation duration is {} hours'.format(app.config['MAX_RESERVATION_DURATION_HOURS']))
+
+    @staticmethod
+    def _check_reservations_count(email, github_id):
+        now = datetime.utcnow()
+        count = models.Reservation.query. \
+            filter_by(email=email, github_id=github_id). \
+            filter(models.Reservation.end_datetime > now).count()
+        return count < app.config['MAX_RESERVATIONS_FOR_USER']
+
+    @staticmethod
+    def _check_duration(start_datetime, end_datetime):
+        return end_datetime - start_datetime < timedelta(hours=app.config['MAX_RESERVATION_DURATION_HOURS'])
+
+    @staticmethod
+    def _start_less_end(start_datetime, end_datetime):
+        return start_datetime < end_datetime
+
+    @staticmethod
+    def _is_active_reservation(start_datetime, end_datetime):
+        return start_datetime <= datetime.utcnow() < end_datetime
+
+    @staticmethod
+    def _start_in_future(start_datetime):
+        return start_datetime > datetime.utcnow()
+
+    @staticmethod
+    def _is_reserved_already(reservation):
         count = models.Reservation.query. \
             filter_by(resource_id=reservation.resource_id). \
             filter((and_(models.Reservation.start_datetime <= reservation.end_datetime,
                          models.Reservation.end_datetime >= reservation.start_datetime,
                          models.Reservation.id != reservation.id))).count()
-        return count == 0
+        return count != 0
 
     @staticmethod
     def _create_user_if_not_exist(**user_params):
@@ -228,6 +270,8 @@ class Reservations(ResourceBase):
 
         params = args_parser.parse_args()
 
+        self._validate_args(params)
+
         user_args = {k: v for (k, v) in params.items() if k in ('email', 'github_id')}
         if not user_args:
             abort(HTTPStatus.BAD_REQUEST, message='Cannot find email or github_id in arguments')
@@ -237,10 +281,16 @@ class Reservations(ResourceBase):
         try:
             user = self._create_user_if_not_exist(**user_args)
             resource = get_item_or_404(models.Resource, **resource_args)
+
+            if not self._check_reservations_count(user.email, user.github_id):
+                abort(HTTPStatus.FORBIDDEN,
+                      message='Max count of reservations for user is {}'.format(app.config['MAX_RESERVATIONS_FOR_USER']))
+
             reservation = models.Reservation(resource_id=resource.id,
                                              user_id=user.id,
                                              **reservation_args)
-            if not self._validate_reservation(reservation):
+
+            if self._is_reserved_already(reservation):
                 abort(HTTPStatus.FORBIDDEN, message="The time is already reserved")
 
             reservation.token = Reservations._generate_unique_token(str(reservation))
