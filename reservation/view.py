@@ -150,10 +150,9 @@ class Reservations(ResourceBase):
     @staticmethod
     def _generate_unique_token(reservation):
         serializer = URLSafeSerializer(app.config['SECRET_KEY'])
-        for i in range(3):
-            token = serializer.dumps(reservation + str(datetime.now()), salt=app.config['SECURITY_PASSWORD_SALT'])
-            if models.Reservation.query.filter_by(token=token).count() == 0:
-                return token
+        token = serializer.dumps(str(datetime.now()) + reservation, salt=app.config['SECURITY_PASSWORD_SALT'])
+        if models.Reservation.query.filter_by(token=token).count() == 0:
+            return token
         raise RuntimeError('Cannot generate unique access token')
 
     @marshal_with(reservation_fields)
